@@ -9,11 +9,27 @@ from .base import Base
 
 from deoplete.util import charpos2bytepos
 from deoplete.util import error
+def dub_import_dirs(startdir):
+    #Search for dub.json/dub.sdl
+    curr_dir = os.path.abspath(startdir)
+    found = False
+    while curr_dir != "/" and curr_dir != "":
+        if os.path.isfile(curr_dir+"/dub.json") or os.path.isfile(curr_dir+"/dub.sdl"):
+            found = True
+            break
+        curr_dir = os.path.normpath(os.path.join(curr_dir, os.pardir))
+
+    if not found:
+        return []
+
+    ret = []
+    #Gather the import dirs from dub
+    process = subprocess.Popen(["dub", "describe", "--annotate", "--data-0", "--data=import-paths"], cwd=curr_dir,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    outs, errs = process.communicate()
+    return outs.split('\x00')
 
 class Source(Base):
-    SRC_DIR = "{0}src{0}".format(os.pathsep)
-    SOURCE_DIR = "{0}source{0}".format(os.pathsep)
-
     def __init__(self, vim):
         Base.__init__(self, vim)
 
@@ -44,7 +60,7 @@ class Source(Base):
 
         self._dcd_client_binary = self.vim.vars['deoplete#sources#d#dcd_client_binary']
         self._dcd_server_binary = self.vim.vars['deoplete#sources#d#dcd_server_binary']
-        self.import_dirs = []
+        self.import_dirs_cache = {}
 
         #TODO handle dcd-server autostart properly
         #if self.vim.vars['deoplete#sources#d#dcd_server_autostart'] == 1:
@@ -67,16 +83,12 @@ class Source(Base):
 
         buf_path = os.path.dirname(buf.name);
 
-        for dir in [self.SRC_DIR, self.SOURCE_DIR]:
-            if dir in buf_path:
-                buf_path = buf_path[:buf_path.find(dir) + len(dir)]
-                break
-
         args = [self.dcd_client_binary(), "-c" + str(offset)]
         #Use buf_path as import_dirs is a terrible idea
-        if not buf_path in self.import_dirs:
-            args.append("-I{}".format(buf_path))
-            self.import_dirs.append(buf_path)
+        if buf.name not in self.import_dirs_cache:
+            self.import_dirs_cache[buf.name] = dub_import_dirs(os.path.dirname(buf.name))
+
+        args.append(self.import_dirs_cache[buf.name])
 
         process = subprocess.Popen(args,
                                    stdin=subprocess.PIPE,
