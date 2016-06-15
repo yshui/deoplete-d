@@ -14,7 +14,7 @@ def dub_import_dirs(startdir):
     curr_dir = os.path.abspath(startdir)
     found = False
     while curr_dir != "/" and curr_dir != "":
-        if os.path.isfile(curr_dir+"/dub.json") or os.path.isfile(curr_dir+"/dub.sdl"):
+        if os.path.isfile(curr_dir+"/dub.json") or os.path.isfile(curr_dir+"/dub.sdl") or os.path.isfile(curr_dir+"/package.json"):
             found = True
             break
         curr_dir = os.path.normpath(os.path.join(curr_dir, os.pardir))
@@ -27,7 +27,7 @@ def dub_import_dirs(startdir):
     process = subprocess.Popen(["dub", "describe", "--annotate", "--data-0", "--data=import-paths"], cwd=curr_dir,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     outs, errs = process.communicate()
-    return outs.split('\x00')
+    return outs.decode().split('\x00')
 
 class Source(Base):
     def __init__(self, vim):
@@ -88,7 +88,7 @@ class Source(Base):
         if buf.name not in self.import_dirs_cache:
             self.import_dirs_cache[buf.name] = dub_import_dirs(os.path.dirname(buf.name))
 
-        args.append(self.import_dirs_cache[buf.name])
+        args = args+self.import_dirs_cache[buf.name]
 
         process = subprocess.Popen(args,
                                    stdin=subprocess.PIPE,
