@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import sys
+import json
 
 from .base import Base
 
@@ -45,9 +46,10 @@ class Source(Base):
         self._dcd_server_binary = self.vim.vars['deoplete#sources#d#dcd_server_binary']
         self.import_dirs = []
 
-        if self.vim.vars['deoplete#sources#d#dcd_server_autostart'] == 1:
-            process = subprocess.Popen([self.dcd_server_binary()])
-            atexit.register(lambda: process.kill())
+        #TODO handle dcd-server autostart properly
+        #if self.vim.vars['deoplete#sources#d#dcd_server_autostart'] == 1:
+        #    process = subprocess.Popen([self.dcd_server_binary()])
+        #    atexit.register(lambda: process.kill())
 
     def get_complete_position(self, context):
         m = re.search(r'\w*$', context['input'])
@@ -59,7 +61,7 @@ class Source(Base):
 
         buf = self.vim.current.buffer
         offset = self.vim.call('line2byte', line) + \
-            charpos2bytepos(self.vim, context['input'][: column], column) - 1
+            charpos2bytepos(self.vim.options['encoding'], context['input'][: column], column) - 1
         offset += len(context['complete_str'])
         source = '\n'.join(buf).encode()
 
@@ -71,6 +73,7 @@ class Source(Base):
                 break
 
         args = [self.dcd_client_binary(), "-c" + str(offset)]
+        #Use buf_path as import_dirs is a terrible idea
         if not buf_path in self.import_dirs:
             args.append("-I{}".format(buf_path))
             self.import_dirs.append(buf_path)
